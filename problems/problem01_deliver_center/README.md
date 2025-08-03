@@ -23,7 +23,7 @@
 配達リクエストは以下の情報を持つ。
 配達ID: 5 桁の数字。先頭の数字が0であるような番号も与えられうる。
 状態: 配達待ち、配達中、配達済のどれか。
-タイプ: NORMAL (通常), EXPRESS (速達), SCHEDULED (時間指定、応用実装のみ) のどれか。
+タイプ: NORMAL (通常), EXPRESS (速達), SCHEDULED (時間指定) のどれか。
 配達時間: 配達の所要時間 (分)
 
 SCHEDULED タイプの配達リクエストは、加えて以下の情報を持つ。
@@ -208,6 +208,7 @@ Step 3: 配達リクエストの割り当て
 テストケース
 
 テストケース1: 基本的な配達フロー
+
 入力:
 1 10:00 NORMAL 12345 30
 1 10:05 EXPRESS 12346 20
@@ -219,13 +220,17 @@ Step 3: 配達リクエストの割り当て
 1 10:30 12345 has been delivered.
 1 10:30 12346 has been assigned.
 1 10:50 12346 has been delivered.
+
 テストケース2: 配達時間超過エラー
+
 入力:
 1 10:00 NORMAL 12345 150
 
 期待出力:
 1 10:00 ERROR: Delivery time cannot exceed 120 minutes.
+
 テストケース3: EXPRESS優先処理
+
 入力:
 1 10:00 NORMAL 12345 30
 1 10:05 EXPRESS 12346 20
@@ -241,8 +246,9 @@ Step 3: 配達リクエストの割り当て
 1 10:30 12345 has been delivered.
 1 10:30 12346 has been assigned.
 1 10:50 12346 has been delivered.
-応用実装テストケース
+
 テストケース4: 時間指定配達
+
 入力:
 1 10:00 SCHEDULED 12345 30 1 11:00
 1 10:30 NORMAL 12346 20
@@ -254,13 +260,17 @@ Step 3: 配達リクエストの割り当て
 1 10:50 12346 has been delivered.
 1 10:50 12345 has been assigned.
 1 11:00 12345 has been delivered.
+
 テストケース5: 時間指定配達エラー（時間が近すぎる）
+
 入力:
 1 10:00 SCHEDULED 12345 30 1 10:20
 
 期待出力:
 1 10:00 ERROR: The scheduled delivery time is too close.
+
 テストケース6: キャンセル機能
+
 入力:
 1 10:00 NORMAL 12345 30
 1 10:05 CANCEL 12345
