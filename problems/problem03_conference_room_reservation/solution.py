@@ -158,31 +158,33 @@ class RecurringBookingGenerator:
     def __init__(self, system):
         self.system = system
     
-    def generate_weekly_bookings(self, employee_id, room_id, start_time, end_time, participants, start_date, end_date):
-        """週次の繰り返し予約を生成"""
+    def generate_weekly_bookings_optimized(self, employee_id, room_id, start_time, end_time, participants, start_date, end_date):
         start_dt = datetime.strptime(start_date, "%Y-%m-%d")
         end_dt = datetime.strptime(end_date, "%Y-%m-%d")
         
         bookings_created = 0
         current_dt = start_dt
-        target_weekday = start_dt.weekday()
         
         while current_dt <= end_dt:
-            if current_dt.weekday() == target_weekday:
-                current_date_str = current_dt.strftime("%Y-%m-%d")
-                start_datetime = DateTime(current_date_str, start_time)
-                end_datetime = DateTime(current_date_str, end_time)
+            current_date_str = current_dt.strftime("%Y-%m-%d")
+            start_datetime = DateTime(current_date_str, start_time)
+            end_datetime = DateTime(current_date_str, end_time)
                 
-                # バリデーション
-                error = self.system.validator.validate(employee_id, room_id, start_datetime, end_datetime, participants)
-                if error:
-                    return error, 0
-                
-                # 予約作成
-                self.system._create_booking(employee_id, room_id, start_datetime, end_datetime, participants)
-                bookings_created += 1
+            # バリデーション
+            error = self.system.validator.validate(employee_id, room_id, start_datetime, end_datetime, participants)
+            if error:
+                return error, 0
             
-            current_dt += timedelta(days=1)
+            self.system._create_booking(employee_id, room_id, start_datetime, end_datetime, participants)
+            # 予約作成処理
+            bookings_created += 1
+            
+            # 次の週の同じ曜日へ
+            current_dt += timedelta(days=7)
+            
+            # 終了日を超えた場合は終了
+            if current_dt > end_dt:
+                break
         
         return None, bookings_created
 
