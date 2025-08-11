@@ -1,141 +1,41 @@
 import sys
-
-class Time:
-    """時刻を管理するクラス"""
-    def __init__(self, time_str):
-        parts = time_str.split(':')
-        self.hour = int(parts[0])
-        self.minute = int(parts[1])
-    
-    def __str__(self):
-        return f"{self.hour:02d}:{self.minute:02d}"
-    
-    def __eq__(self, other):
-        return self.hour == other.hour and self.minute == other.minute
-    
-    def __lt__(self, other):
-        return self.to_minutes() < other.to_minutes()
-    
-    def __le__(self, other):
-        return self.to_minutes() <= other.to_minutes()
-    
-    def to_minutes(self):
-        """00:00からの経過分数を返す"""
-        return self.hour * 60 + self.minute
-    
-    def is_15_minute_interval(self):
-        """15分単位かチェック"""
-        return self.minute % 15 == 0
-    
-    def is_business_hours(self):
-        """営業時間内かチェック（09:00以上18:00未満）"""
-        return 9 * 60 <= self.to_minutes() < 18 * 60
-    
-    def duration_minutes(self, end_time):
-        """終了時刻との差を分で返す"""
-        return end_time.to_minutes() - self.to_minutes()
-
-class Date:
-    """日付を管理するクラス"""
-    def __init__(self, date_str):
-        parts = date_str.split('-')
-        self.year = int(parts[0])
-        self.month = int(parts[1])
-        self.day = int(parts[2])
-    
-    def __str__(self):
-        return f"{self.year}-{self.month:02d}-{self.day:02d}"
-    
-    def __eq__(self, other):
-        return self.year == other.year and self.month == other.month and self.day == other.day
-    
-    def __lt__(self, other):
-        if self.year != other.year:
-            return self.year < other.year
-        if self.month != other.month:
-            return self.month < other.month
-        return self.day < other.day
-    
-    def __le__(self, other):
-        return self == other or self < other
-    
-    def get_weekday(self):
-        """曜日を取得（0=月曜日, 6=日曜日）"""
-        # ツェラーの公式を使用
-        year = self.year
-        month = self.month
-        day = self.day
-        
-        if month < 3:
-            month += 12
-            year -= 1
-        
-        q = day
-        m = month
-        k = year % 100
-        j = year // 100
-        
-        h = (q + ((13 * (m + 1)) // 5) + k + (k // 4) + (j // 4) - 2 * j) % 7
-        
-        # ツェラーの公式では土曜日が0、日曜日が1なので調整
-        return (h + 5) % 7
-    
-    def is_business_day(self):
-        """平日かチェック（月〜金）"""
-        return self.get_weekday() < 5
-    
-    def add_days(self, days):
-        """指定日数後の日付を返す"""
-        # 月ごとの日数
-        days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-        
-        year = self.year
-        month = self.month
-        day = self.day + days
-        
-        while day > self._get_days_in_month(year, month):
-            day -= self._get_days_in_month(year, month)
-            month += 1
-            if month > 12:
-                month = 1
-                year += 1
-        
-        return Date(f"{year}-{month:02d}-{day:02d}")
-    
-    def _get_days_in_month(self, year, month):
-        """指定年月の日数を返す"""
-        days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-        if month == 2 and self._is_leap_year(year):
-            return 29
-        return days_in_month[month - 1]
-    
-    def _is_leap_year(self, year):
-        """うるう年かチェック"""
-        return (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
+from datetime import datetime, timedelta
 
 class DateTime:
     """日時を管理するクラス"""
-    def __init__(self, date, time):
-        self.date = date if isinstance(date, Date) else Date(date)
-        self.time = time if isinstance(time, Time) else Time(time)
+    def __init__(self, date_str, time_str):
+        self.date_str = date_str
+        self.time_str = time_str
+        self.dt = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
     
     def __str__(self):
-        return f"{self.date} {self.time}"
+        return f"{self.date_str} {self.time_str}"
     
     def __eq__(self, other):
-        return self.date == other.date and self.time == other.time
+        return self.dt == other.dt
     
     def __lt__(self, other):
-        if self.date != other.date:
-            return self.date < other.date
-        return self.time < other.time
+        return self.dt < other.dt
     
     def __le__(self, other):
-        return self == other or self < other
+        return self.dt <= other.dt
     
-    def is_overlapping(self, other_start, other_end):
-        """時間帯が重複するかチェック"""
-        return not (other_end <= self or other_start >= DateTime(self.date, self.time))
+    def is_business_day(self):
+        """平日かチェック（月〜金）"""
+        return self.dt.weekday() < 5
+    
+    def is_business_hours(self):
+        """営業時間内かチェック（09:00以上18:00未満）"""
+        hour_minutes = self.dt.hour * 60 + self.dt.minute
+        return 9 * 60 <= hour_minutes < 18 * 60
+    
+    def is_15_minute_interval(self):
+        """15分単位かチェック"""
+        return self.dt.minute % 15 == 0
+    
+    def duration_minutes(self, other):
+        """他のDateTimeとの時間差を分で返す"""
+        return int((other.dt - self.dt).total_seconds() / 60)
 
 class Room:
     """会議室を管理するクラス"""
@@ -207,7 +107,7 @@ class BookingValidator:
             return "ERROR: Time must be in 15-minute intervals"
         
         # 予約時間の確認
-        duration = start_datetime.time.duration_minutes(end_datetime.time)
+        duration = start_datetime.duration_minutes(end_datetime)
         if duration < 30:
             return "ERROR: Minimum booking duration is 30 minutes"
         if duration > 240:
@@ -227,15 +127,15 @@ class BookingValidator:
     
     def _is_valid_business_time(self, start_datetime, end_datetime):
         """営業時間と営業日をチェック"""
-        return (start_datetime.date.is_business_day() and 
-                end_datetime.date.is_business_day() and
-                start_datetime.time.is_business_hours() and 
-                end_datetime.time.is_business_hours())
+        return (start_datetime.is_business_day() and 
+                end_datetime.is_business_day() and
+                start_datetime.is_business_hours() and 
+                end_datetime.is_business_hours())
     
     def _is_15_minute_intervals(self, start_datetime, end_datetime):
         """15分単位かチェック"""
-        return (start_datetime.time.is_15_minute_interval() and 
-                end_datetime.time.is_15_minute_interval())
+        return (start_datetime.is_15_minute_interval() and 
+                end_datetime.is_15_minute_interval())
     
     def _check_overlapping_bookings(self, employee_id, room_id, start_datetime, end_datetime):
         """重複予約をチェック"""
@@ -260,14 +160,18 @@ class RecurringBookingGenerator:
     
     def generate_weekly_bookings(self, employee_id, room_id, start_time, end_time, participants, start_date, end_date):
         """週次の繰り返し予約を生成"""
-        bookings_created = 0
-        current_date = start_date
-        target_weekday = start_date.get_weekday()
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
         
-        while current_date <= end_date:
-            if current_date.get_weekday() == target_weekday:
-                start_datetime = DateTime(current_date, start_time)
-                end_datetime = DateTime(current_date, end_time)
+        bookings_created = 0
+        current_dt = start_dt
+        target_weekday = start_dt.weekday()
+        
+        while current_dt <= end_dt:
+            if current_dt.weekday() == target_weekday:
+                current_date_str = current_dt.strftime("%Y-%m-%d")
+                start_datetime = DateTime(current_date_str, start_time)
+                end_datetime = DateTime(current_date_str, end_time)
                 
                 # バリデーション
                 error = self.system.validator.validate(employee_id, room_id, start_datetime, end_datetime, participants)
@@ -278,7 +182,7 @@ class RecurringBookingGenerator:
                 self.system._create_booking(employee_id, room_id, start_datetime, end_datetime, participants)
                 bookings_created += 1
             
-            current_date = current_date.add_days(1)
+            current_dt += timedelta(days=1)
         
         return None, bookings_created
 
@@ -320,13 +224,8 @@ class BookingSystem:
     
     def book_recurring(self, employee_id, room_id, start_time, end_time, participants, start_date, end_date):
         """繰り返し予約"""
-        start_date_obj = Date(start_date)
-        end_date_obj = Date(end_date)
-        start_time_obj = Time(start_time)
-        end_time_obj = Time(end_time)
-        
         error, bookings_created = self.recurring_generator.generate_weekly_bookings(
-            employee_id, room_id, start_time_obj, end_time_obj, participants, start_date_obj, end_date_obj
+            employee_id, room_id, start_time, end_time, participants, start_date, end_date
         )
         
         if error:
@@ -351,42 +250,38 @@ class BookingSystem:
     
     def status(self, room_id, date_str):
         """会議室の予約状況を表示"""
-        target_date = Date(date_str)
         print(f"ROOM_STATUS {room_id} {date_str}:")
         
         # 指定日の予約を取得
-        day_bookings = self._get_room_bookings_for_date(room_id, target_date)
+        day_bookings = self._get_room_bookings_for_date(room_id, date_str)
         
         if not day_bookings:
             print("No bookings")
             return
         
         # 時刻順にソート
-        day_bookings.sort(key=lambda b: b.start_datetime.time.to_minutes())
+        day_bookings.sort(key=lambda b: b.start_datetime.dt)
         
         for booking in day_bookings:
             employee_name = self.employees[booking.employee_id].name
-            print(f"{booking.start_datetime.time}-{booking.end_datetime.time}: {booking.id} ({employee_name}, {booking.participants}人)")
+            print(f"{booking.start_datetime.time_str}-{booking.end_datetime.time_str}: {booking.id} ({employee_name}, {booking.participants}人)")
     
     def list_employee(self, employee_id, start_date, end_date):
         """社員の予約一覧を表示"""
-        start_date_obj = Date(start_date)
-        end_date_obj = Date(end_date)
         print(f"EMPLOYEE_BOOKINGS {employee_id}:")
         
         # 期間内の予約を取得
-        employee_bookings = self._get_employee_bookings_for_period(employee_id, start_date_obj, end_date_obj)
+        employee_bookings = self._get_employee_bookings_for_period(employee_id, start_date, end_date)
         
         if not employee_bookings:
             print("No bookings")
             return
         
         # 日時順にソート
-        employee_bookings.sort(key=lambda b: (b.start_datetime.date.year, b.start_datetime.date.month, 
-                                            b.start_datetime.date.day, b.start_datetime.time.to_minutes()))
+        employee_bookings.sort(key=lambda b: b.start_datetime.dt)
         
         for booking in employee_bookings:
-            print(f"{booking.start_datetime.date} {booking.start_datetime.time}-{booking.end_datetime.time}: {booking.room_id} ({booking.participants}人) {booking.id}")
+            print(f"{booking.start_datetime.date_str} {booking.start_datetime.time_str}-{booking.end_datetime.time_str}: {booking.room_id} ({booking.participants}人) {booking.id}")
     
     def _create_booking(self, employee_id, room_id, start_datetime, end_datetime, participants):
         """予約を作成"""
@@ -403,14 +298,17 @@ class BookingSystem:
         return [booking for booking in self.bookings.values()
                 if (booking.is_active() and 
                     booking.room_id == room_id and 
-                    booking.start_datetime.date == target_date)]
+                    booking.start_datetime.date_str == target_date)]
     
     def _get_employee_bookings_for_period(self, employee_id, start_date, end_date):
         """指定社員の指定期間の予約を取得"""
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+        
         return [booking for booking in self.bookings.values()
                 if (booking.is_active() and 
                     booking.employee_id == employee_id and
-                    start_date <= booking.start_datetime.date <= end_date)]
+                    start_dt <= booking.start_datetime.dt.replace(hour=0, minute=0, second=0, microsecond=0) <= end_dt)]
 
 class CommandProcessor:
     """コマンド処理を管理するクラス"""
